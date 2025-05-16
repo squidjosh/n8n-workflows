@@ -1,0 +1,121 @@
+{
+  "name": "Linkedin News Poster",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d2731293-480a-4497-9581-882efa332d2f",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://www.channel4.com/news/feed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "id": "7623366a-f5fc-4970-a139-6d848f959740",
+      "name": "RSS Read"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.slice(0, 5); // Change 3 to 5 if you want more"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "4c04c9b8-f21a-4530-a54f-576ee906efb5",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "phi3:mini"
+            },
+            {
+              "name": "prompt",
+              "value": "=You are an experienced content creator and writer with subject matter expertise in race equity and race discrimination.  \n\nEvaluate the following headline and determine if the headline and story can be related to the topic of race equity and or race discrimination.  \n\nAnswer with only YES or NO followed by a very brief explanation if YES.  Headline: {{ $json.title }} \n"
+            },
+            {
+              "name": "stream",
+              "value": "={{ false }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "8eea089a-fb5c-4133-b479-402c22088cdc",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1a0f91bb-cb62-4941-bad1-6efeac72af74",
+  "meta": {
+    "instanceId": "2fa0f2752f90e06dcef03a27eab581583af12f90dcd518193f6bf269dc9ab917"
+  },
+  "id": "fczLjNJO9yUow8pT",
+  "tags": []
+}
