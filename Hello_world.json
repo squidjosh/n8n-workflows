@@ -1,0 +1,63 @@
+{
+  "name": "Hello world",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "6d5026df-f1dd-477a-a081-8265e1a6145d",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "83a7db97-4e0d-4ef3-8012-ed1801e76db8",
+              "name": "my message",
+              "value": "Hello N8N!  I am working!",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "58aaf707-99f6-42d7-a7e0-07aa77ddea39",
+      "name": "Edit Fields"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2ed151b1-f9b5-42c5-9f52-cf2a25545cc1",
+  "meta": {
+    "instanceId": "2fa0f2752f90e06dcef03a27eab581583af12f90dcd518193f6bf269dc9ab917"
+  },
+  "id": "VndFEgxFrOJA39Yp",
+  "tags": []
+}
