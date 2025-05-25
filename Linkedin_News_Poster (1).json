@@ -1,0 +1,407 @@
+{
+  "name": "Linkedin News Poster",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        0
+      ],
+      "id": "d2731293-480a-4497-9581-882efa332d2f",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "options": {
+          "ignoreSSL": false
+        }
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        40,
+        -140
+      ],
+      "id": "72fe9e74-9610-4d55-87ab-07d2cfd0c764",
+      "name": "BBC News Stories"
+    },
+    {
+      "parameters": {
+        "url": "http://rss.cnn.com/rss/cnn_topstories.rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        40,
+        140
+      ],
+      "id": "696134e5-ea7d-4b99-a2f9-a8eb67a168fd",
+      "name": "CNN Top Stories"
+    },
+    {
+      "parameters": {
+        "url": "https://www.channel4.com/news/feed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        40,
+        0
+      ],
+      "id": "7623366a-f5fc-4970-a139-6d848f959740",
+      "name": "Channel 4 Newsfeed"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        280,
+        0
+      ],
+      "id": "ffabc747-7d95-42dc-9be3-79f57bd59b0b",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "phi3:mini"
+            },
+            {
+              "name": "prompt",
+              "value": "=You are an experienced content creator and writer with subject matter expertise in race equity and race discrimination.  \n\nEvaluate the {{  $json.combined_stories_text }} and based on the following list of 5 news story headlines and summaries, please identify the TOP 3 stories that are most clearly and significantly related to topics of race and/or ethnicity (either positively or negatively).\n\nFor each of your chosen top 3 stories, provide:\n1. The original story number (as a string).\n2. A brief explanation (1-2 sentences) of why it's relevant to race/ethnicity (as a string).\n3. A confidence score (as a number from 0 to 10).\n\nIMPORTANT: Your entire response should be ONLY a valid JSON array of objects. Each object in the array should represent one of the top 3 stories and have ONLY the keys: \"original_story_number\", \"explanation\", and \"confidence_score\". Do not include any other text, explanations, or markdown like \\`\\`\\`json before or after the JSON array.\n\nExample of the exact output format expected:\n[\n  {\n    \"original_story_number\": \"X\",\n    \"explanation\": \"Some reason.\",\n    \"confidence_score\": Y\n  },\n  {\n    \"original_story_number\": \"Z\",\n    \"explanation\": \"Another reason.\",\n    \"confidence_score\": W\n  }\n]\n\nHere are the 5 stories to analyze:\n{{ $json.combined_stories_text }}`\n"
+            },
+            {
+              "name": "stream",
+              "value": "={{ false }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        0
+      ],
+      "id": "8eea089a-fb5c-4133-b479-402c22088cdc",
+      "name": "Identifying Race Related Top Stories"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the single input item from the previous HTTP Request node\nconst inputItem = $input.item; \n\nlet llmResponseString = \"\";\n// Initialize outputData as an object to ensure the return type is always correct for N8N\nlet outputDataContainer = { data: null, error: \"Initial error: Could not process LLM response.\" };\n\n// Try to get the LLM's response string\nif (inputItem.json && typeof inputItem.json.response === 'string') {\n  llmResponseString = inputItem.json.response;\n} else {\n  outputDataContainer.error = \"LLM response string not found or not a string.\";\n  return [{ json: outputDataContainer }];\n}\n\n// Aggressively clean the string\nlet cleanString = llmResponseString;\nif (cleanString.startsWith(\"```json\")) {\n  cleanString = cleanString.substring(7);\n  if (cleanString.endsWith(\"```\")) {\n    cleanString = cleanString.substring(0, cleanString.length - 3);\n  }\n} else if (cleanString.startsWith(\"```\")) {\n  cleanString = cleanString.substring(3);\n  if (cleanString.endsWith(\"```\")) {\n    cleanString = cleanString.substring(0, cleanString.length - 3);\n  }\n}\ncleanString = cleanString.trim();\ncleanString = cleanString.replace(/\\\\n/g, ' ').replace(/\\n/g, ' ').replace(/[\\x00-\\x1F\\x7F-\\x9F]/g, '');\n\n// Attempt to parse\ntry {\n  const parsedJson = JSON.parse(cleanString);\n  // Assign the parsed result to the 'data' key of our output object\n  outputDataContainer.data = parsedJson; \n  // Clear the initial error if parsing was successful\n  delete outputDataContainer.error; \n} catch (e) {\n  console.error(\"Error parsing aggressively cleaned JSON:\", e);\n  console.error(\"String that failed parsing:\", cleanString);\n  outputDataContainer.error = \"Failed to parse aggressively cleaned JSON.\";\n  outputDataContainer.details = e.message;\n  outputDataContainer.cleaned_string_attempted = cleanString;\n  outputDataContainer.original_llm_response = llMResponseString;\n}\n\nreturn [{ json: outputDataContainer }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        0
+      ],
+      "id": "1642e479-abe1-4532-9c4b-23b5cafb7d0d",
+      "name": "LLM Story List"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items from the Merge node\nconst allItems = $input.all();\n\n// Take only the first 5 items (or your chosen number)\nconst selectedItems = allItems.slice(0, 5); \n\n// Create a numbered list of headlines and summaries for the LLM\nlet formattedStoriesForLLM = \"\";\nselectedItems.forEach((item, index) => {\n    let title = \"No title available\";\n    if (item.json && typeof item.json.title === 'string') {\n        title = item.json.title;\n    }\n\n    let summary = \"\";\n    if (item.json) {\n        if (typeof item.json.summary === 'string' && item.json.summary.length > 0) {\n            summary = item.json.summary;\n        } else if (typeof item.json.description === 'string' && item.json.description.length > 0) {\n            summary = item.json.description;\n        }\n    }\n    \n    formattedStoriesForLLM += `${index + 1}. TITLE: ${title}\\n`;\n    if (summary) {\n        formattedStoriesForLLM += `   SUMMARY: ${summary.substring(0, 200)}...\\n\\n`;\n    } else {\n        formattedStoriesForLLM += `\\n`; // Add a blank line even if no summary, for consistent spacing\n    }\n});\n\n// Output a single item containing this formatted string\nreturn [{ json: { combined_stories_text: formattedStoriesForLLM } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "id": "4c04c9b8-f21a-4530-a54f-576ee906efb5",
+      "name": "Sorting Station"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the input item from the \"Parse LLM Story List\" node\nconst inputItem = $input.item;\nlet choicesMessage = \"LLM Processing Error: Could not format story choices.\"; // Default error\nlet storyChoicesArray = []; // To store the original choices for later\n\n// The array of stories should be in inputItem.json.data\nif (inputItem.json && inputItem.json.data && Array.isArray(inputItem.json.data)) {\n    storyChoicesArray = inputItem.json.data; // Save the original array\n    if (storyChoicesArray.length === 0) {\n        choicesMessage = \"The LLM didn't identify any relevant stories this time.\";\n    } else {\n        choicesMessage = \"Please review these top stories and reply with the number (e.g., 1, 2, or 3) of the one you want to post:\\n\\n\";\n        storyChoicesArray.forEach((story, index) => {\n            choicesMessage += `CHOICE ${index + 1}:\\n`;\n            choicesMessage += `  Original #: ${story.original_story_number || 'N/A'}\\n`;\n            choicesMessage += `  Score: ${story.confidence_score || 'N/A'}\\n`;\n            choicesMessage += `  Explanation: ${story.explanation || 'No explanation.'}\\n\\n`;\n        });\n    }\n} else {\n    choicesMessage = \"Error: Could not find the list of parsed stories from the LLM.\";\n    console.error(\"FormatChoicesNode: 'inputItem.json.data' was not found or not an array:\", inputItem.json);\n}\n\n// Output the formatted message AND the original array of choices\nreturn [{ json: { telegram_message_text: choicesMessage, original_story_choices_array: storyChoicesArray } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "8771dd59-2ad4-447c-b745-511c4ac4429b",
+      "name": "Format for Telegram"
+    },
+    {
+      "parameters": {
+        "chatId": "8120361604",
+        "text": "={{ $json.telegram_message_text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1220,
+        0
+      ],
+      "id": "a03524ea-e775-4d3c-916c-9ad8b24b8c9b",
+      "name": "Telegram",
+      "webhookId": "90a25c56-763d-450c-bc8c-edd2b356a758",
+      "credentials": {
+        "telegramApi": {
+          "id": "nL3vTYdzLXIjZpfH",
+          "name": "My N8N Telegram Bot "
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e4f2d366-b6de-4be4-b442-62e44fff6e44"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a6cb081d-3f77-479d-b8b1-6eec480ea897",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5d4955a9-5fcb-4401-8d9c-bab12ae48892",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1620,
+        -160
+      ],
+      "id": "d5c69dae-41b2-4db2-a262-84151da83d86",
+      "name": "My Response"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "chatIds": "8120361604"
+        }
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1480,
+        -160
+      ],
+      "id": "4296d64d-c58d-4638-979e-159c9bfef776",
+      "name": "Telegram Trigger",
+      "webhookId": "b11aacce-13da-4b67-a694-32df25dbbf6c",
+      "notesInFlow": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "nL3vTYdzLXIjZpfH",
+          "name": "My N8N Telegram Bot "
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Channel 4 Newsfeed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "BBC News Stories",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CNN Top Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channel 4 Newsfeed": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Sorting Station",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CNN Top Stories": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "BBC News Stories": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identifying Race Related Top Stories": {
+      "main": [
+        [
+          {
+            "node": "LLM Story List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sorting Station": {
+      "main": [
+        [
+          {
+            "node": "Identifying Race Related Top Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Story List": {
+      "main": [
+        [
+          {
+            "node": "Format for Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format for Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5428ae11-5b48-4123-88e9-ca7fcf4194c8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2fa0f2752f90e06dcef03a27eab581583af12f90dcd518193f6bf269dc9ab917"
+  },
+  "id": "fczLjNJO9yUow8pT",
+  "tags": [
+    {
+      "createdAt": "2025-05-24T14:11:29.514Z",
+      "updatedAt": "2025-05-24T14:11:29.514Z",
+      "id": "B5QpCFllrm3Q44Zg",
+      "name": "news stories"
+    }
+  ]
+}
